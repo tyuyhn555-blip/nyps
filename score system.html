@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班級加分管理系統</title>
+    <style>
+        /* 定義顏色：主題色改為 #594432，置中按鈕 */
+        :root { 
+            --primary: #594432; 
+            --success: #2ecc71; 
+            --rank: #f39c12; 
+            --bg: #f8f6f4; 
+        }
+        
+        body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 0; margin: 0; }
+        
+        /* 登入畫面 */
+        #loginOverlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(89, 68, 50, 0.98); display: flex; justify-content: center; align-items: center; z-index: 9999; 
+        }
+        .login-box { 
+            background: white; padding: 35px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); 
+            text-align: center; width: 85%; max-width: 350px; border-top: 8px solid var(--primary);
+        }
+        .login-box h2 { color: var(--primary); margin-bottom: 25px; }
+        .login-box input { 
+            width: 100%; padding: 15px; margin-bottom: 20px; border: 2px solid #eee; 
+            border-radius: 10px; font-size: 1.2rem; text-align: center; box-sizing: border-box; 
+        }
+        .login-box button { 
+            width: 100%; padding: 12px; background: var(--primary); color: white; 
+            border: none; border-radius: 10px; font-size: 1.1rem; cursor: pointer; font-weight: bold; 
+        }
+
+        /* 主畫面 */
+        #mainContent { display: none; padding: 15px; }
+        .container { max-width: 800px; margin: 10px auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+        
+        .mode-switch { display: flex; justify-content: center; gap: 12px; margin-bottom: 25px; }
+        .mode-btn { border: 2px solid var(--primary); background: white; color: var(--primary); padding: 10px 25px; border-radius: 25px; cursor: pointer; font-weight: bold; }
+        .mode-btn.active { background: var(--primary); color: white; }
+        
+        /* 班級分頁置中 */
+        .tabs { 
+            display: flex; gap: 8px; margin-bottom: 25px; border-bottom: 2px solid #eee; 
+            overflow-x: auto; padding-bottom: 10px; justify-content: center; 
+        }
+        .tab-btn { 
+            padding: 10px 18px; border: none; background: #f0f0f0; cursor: pointer; 
+            border-radius: 10px; font-weight: bold; color: #666; white-space: nowrap; 
+        }
+        .tab-btn.active { background: var(--primary); color: white; }
+
+        /* 學生卡片 */
+        .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; }
+        .student-card { 
+            border: 1px solid #eee; padding: 18px 10px; text-align: center; border-radius: 12px; 
+            cursor: pointer; background: #fff; position: relative; transition: 0.2s; font-weight: bold;
+        }
+        .student-card:active { transform: scale(0.95); }
+        .student-card.added { border-color: var(--success); background-color: #f0fff4; color: var(--success); }
+        .student-card.added::after { content: "✅"; position: absolute; top: 6px; right: 8px; font-size: 14px; }
+
+        /* 排行榜 */
+        .rank-list { display: none; flex-direction: column; gap: 10px; }
+        .rank-row { display: flex; align-items: center; background: #fff; border: 1px solid #eee; padding: 15px 25px; border-radius: 12px; }
+        .rank-number { width: 45px; font-weight: bold; color: var(--rank); font-size: 1.3rem; }
+        .rank-name { flex-grow: 1; font-size: 1.2rem; }
+        
+        #statusInfo { text-align: center; height: 25px; font-size: 0.9rem; color: var(--primary); margin-bottom: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="loginOverlay">
+    <div class="login-box">
+        <h2>登入加分系統</h2>
+        <input type="password" id="passInput" placeholder="請輸入進入密碼" onkeypress="if(event.key==='Enter') checkAccess()">
+        <button onclick="checkAccess()">確認進入</button>
+        <p id="loginError" style="color:#ffdddd; font-size:0.9rem; display:none; margin-top:10px;">密碼錯誤，請再試一次</p>
+    </div>
+</div>
+
+<div id="mainContent">
+    <div class="container">
+        <div class="mode-switch">
+            <button class="mode-btn active" id="btnRecord" onclick="setMode('record')">➕ 紀錄加分</button>
+            <button class="mode-btn" id="btnRank" onclick="setMode('rank')">🏆 總排行榜</button>
+        </div>
+
+        <div class="tabs" id="classTabs">
+            </div>
+
+        <div id="statusInfo"></div>
+        <div id="recordView" class="student-grid"></div>
+        <div id="rankView" class="rank-list"></div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 1. 請在此填入你的 GAS 部署網址
+    // ==========================================
+    const API_URL = "https://script.google.com/macros/s/AKfycbyH6uDV34mQfsFMX_r74NEsU9aFmQKFy7hIfJmKUyRJgI1pHM2pHjxYdWMo-IjBuvDS/exec";
+    const AUTH_KEY = "ringoapple";
+
+    let currentClass = '';
+    let currentMode = 'record';
+    let studentData = [];
+    let sessionAdded = new Set();
+
+    // 登入驗證並啟動自動抓取
+    async function checkAccess() {
+        if (document.getElementById('passInput').value === AUTH_KEY) {
+            document.getElementById('loginOverlay').style.display = "none";
+            document.getElementById('mainContent').style.display = "block";
+            await fetchClasses(); 
+        } else {
+            document.getElementById('loginError').style.display = "block";
+        }
+    }
+
+    // 自動從 Google 試算表抓取分頁名稱
+    async function fetchClasses() {
+        const info = document.getElementById('statusInfo');
+        info.innerText = "🔍 正在讀取班級清單...";
+        try {
+            const response = await fetch(`${API_URL}?action=getSheets`);
+            const sheetNames = await response.json();
+            // 過濾：只留下名稱中有數字的分頁 (例如 101, 502)
+            const classes = sheetNames.filter(name => name.match(/\d+/));
+            
+            const tabsContainer = document.getElementById('classTabs');
+            tabsContainer.innerHTML = '';
+            
+            classes.forEach((c, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn ${idx === 0 ? 'active' : ''}`;
+                btn.innerText = c;
+                btn.onclick = () => switchClass(c, btn);
+                tabsContainer.appendChild(btn);
+            });
+
+            if (classes.length > 0) {
+                currentClass = classes[0];
+                loadData(currentClass);
+            } else {
+                info.innerText = "⚠️ 試算表內沒有符合格式的分頁";
+            }
+        } catch (e) {
+            info.innerText = "❌ 無法連線至 Google 試算表";
+        }
+    }
+
+    // 載入該班級的學生資料
+    async function loadData(className) {
+        const info = document.getElementById('statusInfo');
+        info.innerText = `☁️ 正在載入 ${className} 班...`;
+        try {
+            const response = await fetch(`${API_URL}?className=${className}&t=${Date.now()}`);
+            studentData = await response.json();
+            refreshUI();
+            info.innerText = "";
+        } catch (e) {
+            info.innerText = "❌ 名單載入失敗";
+        }
+    }
+
+    function refreshUI() {
+        if (currentMode === 'record') renderRecordView();
+        else renderRankView();
+    }
+
+    function renderRecordView() {
+        document.getElementById('recordView').style.display = 'grid';
+        document.getElementById('rankView').style.display = 'none';
+        const list = document.getElementById('recordView');
+        list.innerHTML = '';
+        studentData.forEach(student => {
+            const id = student[0], name = student[1];
+            const div = document.createElement('div');
+            div.className = `student-card ${sessionAdded.has(currentClass + id) ? 'added' : ''}`;
+            div.innerHTML = `<strong>${id}</strong><br>${name}`;
+            div.onclick = () => addPoint(id, name);
+            list.appendChild(div);
+        });
+    }
+
+    function renderRankView() {
+        document.getElementById('recordView').style.display = 'none';
+        document.getElementById('rankView').style.display = 'flex';
+        const list = document.getElementById('rankView');
+        list.innerHTML = '';
+        const sorted = [...studentData].sort((a, b) => Number(b[2]) - Number(a[2]));
+        sorted.forEach((student, index) => {
+            const name = student[1], score = Number(student[2]);
+            const row = document.createElement('div');
+            row.className = 'rank-row';
+            row.innerHTML = `<div class="rank-number">${index + 1}</div><div class="rank-name">${name}</div><div style="color:var(--primary); font-weight:bold;">${score} 分</div>`;
+            list.appendChild(row);
+        });
+    }
+
+    function switchClass(className, btn) {
+        currentClass = className;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadData(className);
+    }
+
+    function setMode(mode) {
+        currentMode = mode;
+        document.getElementById('btnRecord').classList.toggle('active', mode === 'record');
+        document.getElementById('btnRank').classList.toggle('active', mode === 'rank');
+        refreshUI();
+    }
+
+    async function addPoint(id, name) {
+        if (sessionAdded.has(currentClass + id)) return;
+        sessionAdded.add(currentClass + id);
+        renderRecordView();
+        try {
+            await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ className: currentClass, id: id }) });
+            loadData(currentClass); // 加分後重新整理資料
+        } catch (e) { console.log(e); }
+    }
+</script>
+</body>
+</html>
