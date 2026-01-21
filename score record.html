@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雲端試算表成績助手</title>
+    <style>
+        :root { --primary: #4a90e2; --success: #28a745; --bg: #f4f7f6; }
+        body { font-family: sans-serif; background-color: var(--bg); padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 500px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .input-box { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .tabs { display: flex; gap: 5px; margin-bottom: 15px; }
+        .tab { flex: 1; padding: 10px; text-align: center; background: #eee; border-radius: 6px; cursor: pointer; }
+        .tab.active { background: var(--primary); color: white; }
+        .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin: 15px 0; padding: 10px; background: #fafafa; border-radius: 8px; }
+        .std-btn { padding: 12px 0; background: white; border: 1px solid #ccc; border-radius: 6px; text-align: center; cursor: pointer; }
+        .std-btn.active { background: var(--success); color: white; border-color: var(--success); }
+        .std-btn.syncing { background: #ffc107; color: #000; } /* 同步中變黃 */
+        .score-section { background: #e9ecef; padding: 15px; border-radius: 10px; }
+        .display { background: white; height: 50px; line-height: 50px; text-align: center; font-size: 30px; font-weight: bold; border-radius: 8px; border: 2px solid #ddd; margin-bottom: 10px; }
+        .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .key { background: white; padding: 15px; border-radius: 8px; text-align: center; cursor: pointer; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .key.submit { background: var(--primary); color: white; grid-column: span 2; font-weight: bold; }
+        #status { text-align: center; font-size: 14px; margin-top: 10px; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>☁️ 成績雲端同步系統</h2>
+    <input type="text" id="examName" class="input-box" placeholder="輸入評量名稱 (如: 第1次段考)">
+
+    <div class="tabs">
+        <div class="tab active" onclick="changeClass('502', this)">502</div>
+        <div class="tab" onclick="changeClass('503', this)">503</div>
+        <div class="tab" onclick="changeClass('504', this)">504</div>
+        <div class="tab" onclick="changeClass('505', this)">505</div>
+        <div class="tab" onclick="changeClass('506', this)">506</div>
+    </div>
+
+    <div class="student-grid" id="studentGrid"></div>
+
+    <div class="score-section">
+        <div id="targetLabel" style="text-align:center; font-weight:bold; margin-bottom:5px;">請選擇學生</div>
+        <div class="display" id="scoreDisplay"></div>
+        <div class="keypad">
+            <div class="key" onclick="num(1)">1</div><div class="key" onclick="num(2)">2</div><div class="key" onclick="num(3)">3</div>
+            <div class="key" onclick="num(4)">4</div><div class="key" onclick="num(5)">5</div><div class="key" onclick="num(6)">6</div>
+            <div class="key" onclick="num(7)">7</div><div class="key" onclick="num(8)">8</div><div class="key" onclick="num(9)">9</div>
+            <div class="key" onclick="cls()">C</div><div class="key" onclick="num(0)">0</div>
+            <div class="key submit" onclick="uploadData()">雲端存檔</div>
+        </div>
+        <div id="status">雲端狀態：等待指令</div>
+    </div>
+</div>
+
+<script>
+    // 請填入你的 Google 部署網址
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwh_HBQEFuk9P_D29tCvVh2K0TMxnR9QzGJw-REb1gehGoHvSo_7l4_Bdn10hoRAV7UFg/exec"; 
+
+    let curClass = '502', curSeat = null, curScore = '';
+
+    function buildStudents() {
+        const grid = document.getElementById('studentGrid');
+        grid.innerHTML = '';
+        for (let i = 1; i <= 27; i++) {
+            const btn = document.createElement('div');
+            btn.className = 'std-btn';
+            btn.innerText = i;
+            btn.id = 'seat-' + i;
+            btn.onclick = () => selectSeat(i);
+            grid.appendChild(btn);
+        }
+    }
+
+    function changeClass(c, el) {
+        curClass = c;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        curSeat = null; curScore = ''; buildStudents(); updateUI();
+    }
+
+    function selectSeat(s) {
+        curSeat = s; curScore = '';
+        document.querySelectorAll('.std-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('seat-' + s).classList.add('active');
+        updateUI();
+    }
+
+    function num(n) { if(curSeat && curScore.length < 3) { curScore += n; updateUI(); } }
+    function cls() { curScore = ''; updateUI(); }
+    function updateUI() {
+        document.getElementById('scoreDisplay').innerText = curScore;
+        document.getElementById('targetLabel').innerText = curSeat ? `${curClass} 班 ${curSeat} 號` : "請點選學生";
+    }
+
+    function uploadData() {
+        const exam = document.getElementById('examName').value;
+        if (!exam || !curSeat || curScore === '') return alert("資料不完整");
+
+        document.getElementById('status').innerText = "📡 正在同步到雲端...";
+        const activeBtn = document.getElementById('seat-' + curSeat);
+        activeBtn.classList.add('syncing');
+
+        const payload = { cls: curClass, seat: curSeat, exam: exam, score: curScore };
+
+        // 使用 fetch 發送到 Google Apps Script
+        fetch(WEB_APP_URL, {
+            method: "POST",
+            mode: "no-cors", // 重要：跨域請求
+            body: JSON.stringify(payload)
+        }).then(() => {
+            document.getElementById('status').innerText = "✅ 同步成功！";
+            activeBtn.classList.remove('syncing', 'active');
+            activeBtn.style.borderLeft = "5px solid green"; // 標記已完成
+
+            // 自動跳下一位
+            if (curSeat < 27) {
+                setTimeout(() => selectSeat(curSeat + 1), 300);
+            }
+        }).catch(err => {
+            alert("同步失敗，請檢查網路！");
+            document.getElementById('status').innerText = "❌ 同步錯誤";
+        });
+    }
+
+    buildStudents();
+</script>
+</body>
+</html>
