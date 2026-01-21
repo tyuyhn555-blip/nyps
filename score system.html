@@ -3,62 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登入加分系統</title>
+    <title>登入加分系統-自動同步版</title>
     <style>
         :root { --primary: #4a90e2; --success: #2ecc71; --rank: #f39c12; --bg: #f5f7f9; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 0; margin: 0; }
-        
-        /* 登入與權限驗證遮罩 */
-        #loginOverlay, #adminOverlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(74, 144, 226, 0.98); display: flex; justify-content: center; align-items: center; z-index: 9999;
-        }
-        #adminOverlay { background: rgba(0, 0, 0, 0.85); display: none; }
-        
-        .login-box {
-            background: white; padding: 35px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2);
-            text-align: center; width: 85%; max-width: 350px;
-        }
-        .login-box h2 { color: var(--primary); margin-bottom: 25px; font-size: 1.5rem; }
-        .login-box input {
-            width: 100%; padding: 15px; margin-bottom: 20px; border: 2px solid #eee;
-            border-radius: 10px; font-size: 1.2rem; text-align: center; box-sizing: border-box; transition: 0.3s;
-        }
-        .login-box input:focus { border-color: var(--primary); outline: none; }
-        .login-box button {
-            width: 100%; padding: 12px; background: var(--primary); color: white;
-            border: none; border-radius: 10px; font-size: 1.1rem; cursor: pointer; margin-bottom: 10px; font-weight: bold;
-        }
-
-        /* 主程式內容 */
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(74, 144, 226, 0.98); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .login-box { background: white; padding: 35px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); text-align: center; width: 85%; max-width: 350px; }
+        .login-box h2 { color: var(--primary); margin-bottom: 25px; }
+        .login-box input { width: 100%; padding: 15px; margin-bottom: 20px; border: 2px solid #eee; border-radius: 10px; font-size: 1.2rem; text-align: center; box-sizing: border-box; }
+        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
         #mainContent { display: none; padding: 15px; }
         .container { max-width: 800px; margin: 10px auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
         .mode-switch { display: flex; justify-content: center; gap: 12px; margin-bottom: 25px; }
-        .mode-btn { border: 2px solid var(--primary); background: white; color: var(--primary); padding: 10px 25px; border-radius: 25px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .mode-btn { border: 2px solid var(--primary); background: white; color: var(--primary); padding: 10px 25px; border-radius: 25px; cursor: pointer; font-weight: bold; }
         .mode-btn.active { background: var(--primary); color: white; }
-        
-        .tabs { display: flex; gap: 5px; margin-bottom: 25px; border-bottom: 2px solid #eee; overflow-x: auto; padding-bottom: 5px; }
-        .tab-btn { padding: 12px 18px; border: none; background: #f0f0f0; cursor: pointer; border-radius: 10px 10px 0 0; flex: 1; min-width: 65px; font-weight: bold; color: #666; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 25px; border-bottom: 2px solid #eee; overflow-x: auto; padding-bottom: 10px; }
+        .tab-btn { padding: 12px 20px; border: none; background: #f0f0f0; cursor: pointer; border-radius: 10px; font-weight: bold; color: #666; white-space: nowrap; }
         .tab-btn.active { background: #6c757d; color: white; }
-
         .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
-        .student-card { border: 1px solid #eee; padding: 18px 10px; text-align: center; border-radius: 12px; cursor: pointer; background: #fff; position: relative; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-        .student-card:active { transform: scale(0.95); }
+        .student-card { border: 1px solid #eee; padding: 18px 10px; text-align: center; border-radius: 12px; cursor: pointer; background: #fff; position: relative; transition: 0.2s; }
         .student-card.added { border-color: var(--success); background-color: #f0fff4; }
         .student-card.added::after { content: "✅"; position: absolute; top: 6px; right: 8px; font-size: 14px; }
-
         .rank-list { display: none; flex-direction: column; gap: 10px; }
         .rank-row { display: flex; align-items: center; background: #fff; border: 1px solid #eee; padding: 15px 25px; border-radius: 12px; }
-        .rank-row:nth-child(1) { background: #fff9e6; border-color: #f1c40f; }
         .rank-number { width: 45px; font-weight: bold; color: var(--rank); font-size: 1.3rem; }
         .rank-name { flex-grow: 1; font-size: 1.2rem; }
-        
-        .score-section { margin-top: 35px; border-top: 2px dashed #f0f0f0; padding-top: 25px; text-align: center; }
-        .admin-btn { background: #adb5bd; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: 0.3s; }
-        .admin-btn:hover { background: #6c757d; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; display: none; font-size: 0.95rem; }
-        th, td { border: 1px solid #eee; padding: 10px; text-align: center; }
-        th { background: #f8f9fa; }
         #statusInfo { text-align: center; height: 25px; font-size: 0.9rem; color: var(--primary); margin-bottom: 12px; font-weight: bold; }
     </style>
 </head>
@@ -67,18 +36,9 @@
 <div id="loginOverlay">
     <div class="login-box">
         <h2>登入加分系統</h2>
-        <input type="password" id="passInput" placeholder="請輸入進入密碼" onkeypress="if(event.key==='Enter') checkAccess()">
+        <input type="password" id="passInput" placeholder="請輸入進入密碼">
         <button onclick="checkAccess()">確認進入</button>
-        <p id="loginError" style="color:#e74c3c; font-size:0.9rem; display:none; margin-top:10px;">密碼錯誤，請再試一次</p>
-    </div>
-</div>
-
-<div id="adminOverlay">
-    <div class="login-box">
-        <h3>管理者驗證</h3>
-        <input type="password" id="adminPassInput" placeholder="請輸入授權碼" onkeypress="if(event.key==='Enter') confirmAdmin()">
-        <button onclick="confirmAdmin()">驗證並查看</button>
-        <button onclick="document.getElementById('adminOverlay').style.display='none'" style="background:#eee; color:#666;">取消</button>
+        <p id="loginError" style="color:#e74c3c; font-size:0.9rem; display:none; margin-top:10px;">密碼錯誤</p>
     </div>
 </div>
 
@@ -89,79 +49,74 @@
             <button class="mode-btn" id="btnRank" onclick="setMode('rank')">🏆 總排行榜</button>
         </div>
 
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchClass('502')">502</button>
-            <button class="tab-btn" onclick="switchClass('503')">503</button>
-            <button class="tab-btn" onclick="switchClass('504')">504</button>
-            <button class="tab-btn" onclick="switchClass('505')">505</button>
-            <button class="tab-btn" onclick="switchClass('506')">506</button>
-        </div>
+        <div class="tabs" id="classTabs">
+            </div>
 
         <div id="statusInfo"></div>
         <div id="recordView" class="student-grid"></div>
         <div id="rankView" class="rank-list"></div>
-
-        <div class="score-section">
-            <button class="admin-btn" onclick="openAdminAuth()">管理者查看總分 (需密碼)</button>
-            <table id="scoreTable">
-                <thead><tr><th>座號</th><th>姓名</th><th>積分</th></tr></thead>
-                <tbody id="scoreBody"></tbody>
-            </table>
-        </div>
     </div>
 </div>
 
 <script>
-    // 網址已經修正，移除了誤植的字元
+    // ---------------- 請填入你的 API 網址 ----------------
     const API_URL = "https://script.google.com/macros/s/AKfycbyH6uDV34mQfsFMX_r74NEsU9aFmQKFy7hIfJmKUyRJgI1pHM2pHjxYdWMo-IjBuvDS/exec";
     const AUTH_KEY = "ringoapple";
-    let currentClass = '502';
+    // ---------------------------------------------------
+
+    let currentClass = '';
     let currentMode = 'record';
     let studentData = [];
     let sessionAdded = new Set();
 
-    function checkAccess() {
+    async function checkAccess() {
         if (document.getElementById('passInput').value === AUTH_KEY) {
             document.getElementById('loginOverlay').style.display = "none";
             document.getElementById('mainContent').style.display = "block";
-            loadData(currentClass);
+            await fetchClasses(); // 登入成功後，先抓班級
         } else {
             document.getElementById('loginError').style.display = "block";
-            document.getElementById('passInput').value = "";
         }
     }
 
-    function openAdminAuth() {
-        document.getElementById('adminOverlay').style.display = 'flex';
-        document.getElementById('adminPassInput').focus();
-    }
+    async function fetchClasses() {
+        const info = document.getElementById('statusInfo');
+        info.innerText = "🔍 偵測班級中...";
+        try {
+            const response = await fetch(`${API_URL}?action=getSheets`);
+            const sheetNames = await response.json();
+            const classes = sheetNames.filter(name => name.match(/\d+/)); // 只取有數字的分頁
+            
+            const tabsContainer = document.getElementById('classTabs');
+            tabsContainer.innerHTML = '';
+            
+            classes.forEach((c, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn ${idx === 0 ? 'active' : ''}`;
+                btn.innerText = c;
+                btn.onclick = () => switchClass(c, btn);
+                tabsContainer.appendChild(btn);
+            });
 
-    function confirmAdmin() {
-        if (document.getElementById('adminPassInput').value === AUTH_KEY) {
-            document.getElementById('adminOverlay').style.display = 'none';
-            document.getElementById('adminPassInput').value = "";
-            const tbody = document.getElementById('scoreBody');
-            tbody.innerHTML = '';
-            studentData.forEach(s => { tbody.innerHTML += `<tr><td>${s[0]}</td><td>${s[1]}</td><td>${s[2]}</td></tr>`; });
-            document.getElementById('scoreTable').style.display = 'table';
-            window.scrollTo(0, document.body.scrollHeight);
-        } else {
-            alert("密碼錯誤！");
-            document.getElementById('adminPassInput').value = "";
+            if (classes.length > 0) {
+                currentClass = classes[0];
+                loadData(currentClass);
+            }
+        } catch (e) {
+            info.innerText = "❌ 無法取得班級清單";
         }
     }
 
     async function loadData(className) {
         const info = document.getElementById('statusInfo');
-        info.innerText = "☁️ 正在從雲端抓取名單...";
+        info.innerText = `☁️ 讀取 ${className} 名單...`;
         try {
             const response = await fetch(`${API_URL}?className=${className}&t=${Date.now()}`);
-            if (!response.ok) throw new Error();
             studentData = await response.json();
             refreshUI();
             info.innerText = "";
         } catch (e) {
-            info.innerText = "❌ 連線異常，請檢查網路或 API 網址";
+            info.innerText = "❌ 讀取失敗";
         }
     }
 
@@ -193,12 +148,18 @@
         const sorted = [...studentData].sort((a, b) => Number(b[2]) - Number(a[2]));
         sorted.forEach((student, index) => {
             const name = student[1], score = Number(student[2]);
-            let medal = (score > 0) ? (index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "") : "";
             const row = document.createElement('div');
             row.className = 'rank-row';
-            row.innerHTML = `<div class="rank-number">${index + 1}</div><div class="rank-name">${name}</div><div class="rank-medal">${medal}</div>`;
+            row.innerHTML = `<div class="rank-number">${index + 1}</div><div class="rank-name">${name} (${score}分)</div>`;
             list.appendChild(row);
         });
+    }
+
+    function switchClass(className, btn) {
+        currentClass = className;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadData(className);
     }
 
     function setMode(mode) {
@@ -217,14 +178,6 @@
             loadData(currentClass);
         } catch (e) { console.log(e); }
     }
-
-    function switchClass(className) {
-        currentClass = className;
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.innerText === className));
-        document.getElementById('scoreTable').style.display = 'none';
-        loadData(className);
-    }
 </script>
-
 </body>
 </html>
