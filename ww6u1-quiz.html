@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Going To 語法互動教學</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #f5a623;
+            --success-color: #7ed321;
+            --error-color: #d0021b;
+            --bg-color: #f4f7f9;
+        }
+
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; margin: 0; padding: 20px;
+        }
+
+        #quiz-container {
+            background: white; padding: 30px; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            max-width: 700px; width: 100%; position: relative;
+        }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .category-tag { background: #e1f0ff; color: var(--primary-color); padding: 5px 15px; border-radius: 50px; font-size: 0.9rem; font-weight: bold; }
+        .progress-text { font-size: 1rem; color: #666; font-weight: bold; }
+
+        .progress-bar { height: 8px; background: #eee; border-radius: 4px; margin-bottom: 25px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--primary-color); width: 0%; transition: width 0.3s; }
+
+        .question-box { min-height: 120px; }
+        .question-text { font-size: 1.4rem; margin-bottom: 25px; font-weight: 600; color: #333; line-height: 1.5; }
+        
+        .options-container { display: grid; gap: 12px; }
+        .option-btn {
+            padding: 15px 20px; border: 2px solid #f0f0f0; border-radius: 12px;
+            background: white; cursor: pointer; transition: all 0.2s;
+            font-size: 1.1rem; text-align: left; font-weight: 500;
+        }
+        .option-btn:hover { border-color: var(--primary-color); background: #f9fcff; }
+        .option-btn.selected-correct { background: var(--success-color) !important; color: white; border-color: var(--success-color); }
+        .option-btn.selected-wrong { background: var(--error-color) !important; color: white; border-color: var(--error-color); }
+
+        /* Unjumble Area */
+        .answer-area { min-height: 60px; border: 2px dashed var(--primary-color); border-radius: 12px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; padding: 12px; background: #fafbff; align-items: center; }
+        .word-pool { display: flex; flex-wrap: wrap; gap: 10px; }
+        .word-chip { padding: 10px 18px; background: white; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; font-weight: 500; }
+        .word-chip.used { opacity: 0.2; pointer-events: none; }
+
+        .feedback { margin: 20px 0; font-weight: bold; font-size: 1.2rem; text-align: center; height: 30px; }
+
+        /* Navigation Buttons */
+        .nav-controls { display: flex; justify-content: space-between; gap: 15px; margin-top: 10px; }
+        .nav-btn {
+            flex: 1; padding: 12px; border: none; border-radius: 10px;
+            cursor: pointer; font-size: 1rem; font-weight: bold; transition: 0.3s;
+        }
+        .btn-prev { background: #e0e0e0; color: #555; }
+        .btn-prev:hover { background: #d0d0d0; }
+        .btn-next { background: var(--primary-color); color: white; }
+        .btn-next:hover { background: #357abd; }
+        .btn-prev:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .result-screen { text-align: center; }
+        .score-circle { font-size: 4rem; color: var(--primary-color); font-weight: bold; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+<div id="quiz-container">
+    <div id="quiz-content">
+        <div class="header">
+            <span id="category-label" class="category-tag">-</span>
+            <span id="progress-text" class="progress-text">0 / 0</span>
+        </div>
+        <div class="progress-bar"><div id="progress" class="progress-fill"></div></div>
+        
+        <div class="question-box">
+            <div class="question-text" id="question">題目載入中...</div>
+            <div id="interaction-area"></div>
+        </div>
+        
+        <div class="feedback" id="feedback"></div>
+
+        <div class="nav-controls">
+            <button class="nav-btn btn-prev" id="prev-btn" onclick="prevQuestion()">← 上一題講解</button>
+            <button class="nav-btn btn-next" id="next-btn" onclick="handleNext()">下一題 →</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        { type: "tf", cat: "核心概念", q: "“I’m going to the park.” 在本課表示未來很久以後的計畫。", a: false, note: "這在課文中是指「正要去某個地方」。" },
+        { type: "tf", cat: "核心概念", q: "“going to” 在這一課表示「正要去某個地方」。", a: true },
+        { type: "tf", cat: "核心概念", q: "“going to” 後面一定要接地點。", a: true },
+        { type: "unjumble", cat: "句子排序", q: "請重組出正確的句子：", words: ["going", "you", "Where", "are", "?"], a: "Where are you going ?" },
+        { type: "unjumble", cat: "句子排序", q: "請重組出正確的句子：", words: ["going", "to", "I’m", "the park", "."], a: "I’m going to the park ." },
+        { type: "mc", cat: "to 的用法", q: "I’m going ___ the park.", opts: ["at", "to", "in"], a: 1 },
+        { type: "mc", cat: "to 的用法", q: "She’s going ___ the bakery.", opts: ["in", "to", "on"], a: 1 },
+        { type: "mc", cat: "問句回應", q: "Q: Are you going to the park?", opts: ["Yes, I am.", "Yes, I am going."], a: 0 },
+        { type: "mc", cat: "問句回應", q: "Q: Are you going to the bakery?", opts: ["No, I not.", "No, I’m not."], a: 1 },
+        { type: "mc", cat: "be 動詞", q: "Kevin ___ going to the bank.", opts: ["is", "am", "are"], a: 0 },
+        { type: "mc", cat: "be 動詞", q: "They ___ going to the park.", opts: ["is", "am", "are"], a: 2 },
+        { type: "mc", cat: "be 動詞", q: "She ___ going to the post office.", opts: ["is", "am", "are"], a: 0 },
+        { type: "mc", cat: "第三人稱問答", q: "Is Amy going to the hospital?", opts: ["Yes, she does.", "Yes, she is.", "Yes, she are."], a: 1 },
+        { type: "mc", cat: "第三人稱問答", q: "Is Kevin going to the bank?", opts: ["No, he isn’t.", "No, he don’t.", "No, he aren’t."], a: 0 },
+        { type: "tf", cat: "常見錯誤辨識", q: "「I going to the park.」 這句話是正確的嗎？", a: false, note: "正確應為：I **am** going..." },
+        { type: "tf", cat: "常見錯誤辨識", q: "「Where is Kevin going?」 這句話是正確的嗎？", a: true },
+        { type: "tf", cat: "常見錯誤辨識", q: "「She going to the bakery.」 這句話是正確的嗎？", a: false, note: "正確應為：She **is** going..." }
+    ];
+
+    let currentIdx = 0;
+    let score = 0;
+    let userWords = [];
+    let isAnswered = false;
+
+    function loadQuestion() {
+        isAnswered = false;
+        const quiz = questions[currentIdx];
+        document.getElementById('category-label').innerText = quiz.cat;
+        document.getElementById('progress-text').innerText = `${currentIdx + 1} / ${questions.length}`;
+        document.getElementById('question').innerText = quiz.q;
+        document.getElementById('feedback').innerText = "";
+        document.getElementById('prev-btn').disabled = (currentIdx === 0);
+        document.getElementById('next-btn').innerText = (currentIdx === questions.length - 1) ? "查看結果" : "下一題 →";
+        document.getElementById('progress').style.width = `${((currentIdx + 1) / questions.length) * 100}%`;
+        
+        const area = document.getElementById('interaction-area');
+        area.innerHTML = "";
+
+        if (quiz.type === "tf") {
+            const container = createContainer();
+            container.appendChild(createBtn("✅ 正確 (True)", () => check(true, 0)));
+            container.appendChild(createBtn("❌ 錯誤 (False)", () => check(false, 1)));
+            area.appendChild(container);
+        } else if (quiz.type === "mc") {
+            const container = createContainer();
+            quiz.opts.forEach((opt, i) => {
+                container.appendChild(createBtn(opt, () => check(i, i)));
+            });
+            area.appendChild(container);
+        } else if (quiz.type === "unjumble") {
+            renderUnjumble(quiz, area);
+        }
+    }
+
+    function createContainer() {
+        const div = document.createElement('div');
+        div.className = "options-container";
+        return div;
+    }
+
+    function createBtn(text, clickFn) {
+        const b = document.createElement('button');
+        b.className = "option-btn";
+        b.innerText = text;
+        b.onclick = clickFn;
+        return b;
+    }
+
+    function check(val, btnIdx) {
+        if (isAnswered) return;
+        isAnswered = true;
+        const quiz = questions[currentIdx];
+        const isCorrect = (val === quiz.a);
+        const btns = document.querySelectorAll('.option-btn');
+        
+        if (isCorrect) {
+            btns[btnIdx].classList.add('selected-correct');
+            document.getElementById('feedback').innerHTML = "<span style='color:var(--success-color)'>🌟 答對了！</span>";
+            score++;
+        } else {
+            btns[btnIdx].classList.add('selected-wrong');
+            document.getElementById('feedback').innerHTML = `<span style='color:var(--error-color)'>💡 ${quiz.note || "再思考一下喔！"}</span>`;
+        }
+    }
+
+    function renderUnjumble(quiz, area) {
+        userWords = [];
+        const answerArea = document.createElement('div');
+        answerArea.className = "answer-area";
+        answerArea.innerHTML = "<span style='color:#ccc'>點擊下方單字排列句子...</span>";
+        
+        const pool = document.createElement('div');
+        pool.className = "word-pool";
+        
+        const shuffled = [...quiz.words].sort(() => Math.random() - 0.5);
+        shuffled.forEach((word) => {
+            const chip = document.createElement('div');
+            chip.className = "word-chip";
+            chip.innerText = word;
+            chip.onclick = () => {
+                if (userWords.length === 0) answerArea.innerHTML = "";
+                userWords.push(word);
+                chip.classList.add('used');
+                
+                const newChip = document.createElement('div');
+                newChip.className = "word-chip";
+                newChip.innerText = word;
+                newChip.onclick = () => {
+                    userWords = userWords.filter(w => w !== word);
+                    newChip.remove();
+                    chip.classList.remove('used');
+                    if (userWords.length === 0) answerArea.innerHTML = "<span style='color:#ccc'>點擊下方單字排列句子...</span>";
+                };
+                answerArea.appendChild(newChip);
+                if (userWords.length === quiz.words.length) {
+                    const isCorrect = (userWords.join(" ") === quiz.a);
+                    isAnswered = true;
+                    document.getElementById('feedback').innerHTML = isCorrect ? "<span style='color:var(--success-color)'>🌟 完美排列！</span>" : "<span style='color:var(--error-color)'>💡 順序再調整看看喔！</span>";
+                }
+            };
+            pool.appendChild(chip);
+        });
+        area.appendChild(answerArea);
+        area.appendChild(pool);
+    }
+
+    function handleNext() {
+        if (currentIdx < questions.length - 1) {
+            currentIdx++;
+            loadQuestion();
+        } else {
+            showResult();
+        }
+    }
+
+    function prevQuestion() {
+        if (currentIdx > 0) {
+            currentIdx--;
+            loadQuestion();
+        }
+    }
+
+    function showResult() {
+        const container = document.getElementById('quiz-content');
+        const percent = Math.round((score / questions.length) * 100);
+        container.innerHTML = `
+            <div class="result-screen">
+                <h2>測驗完成！</h2>
+                <div class="score-circle">${percent}</div>
+                <p>總答對題數：${score} / ${questions.length}</p>
+                <button class="nav-btn btn-next" style="width:200px" onclick="location.reload()">重新挑戰</button>
+            </div>
+        `;
+    }
+
+    loadQuestion();
+</script>
+
+</body>
+</html>
